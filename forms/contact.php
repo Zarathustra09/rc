@@ -1,41 +1,62 @@
 <?php
-  /**
-  * Requires the "PHP Email Form" library
-  * The "PHP Email Form" library is available only in the pro version of the template
-  * The library should be uploaded to: vendor/php-email-form/php-email-form.php
-  * For more info and help: https://bootstrapmade.com/php-email-form/
-  */
+  use PHPMailer\PHPMailer\PHPMailer;
+  use PHPMailer\PHPMailer\Exception;
+  use PHPMailer\PHPMailer\SMTP;
 
-  // Replace contact@example.com with your real receiving email address
-  $receiving_email_address = 'contact@example.com';
+  // Include Composer's autoloader
+  require '../vendor/autoload.php';
 
-  if( file_exists($php_email_form = '../assets/vendor/php-email-form/php-email-form.php' )) {
-    include( $php_email_form );
-  } else {
-    die( 'Unable to load the "PHP Email Form" Library!');
+  // Get form data and sanitize
+  $name = isset($_POST['name']) ? htmlspecialchars(strip_tags($_POST['name'])) : '';
+  $email = isset($_POST['email']) ? filter_var($_POST['email'], FILTER_SANITIZE_EMAIL) : '';
+  $subject = isset($_POST['subject']) ? htmlspecialchars(strip_tags($_POST['subject'])) : '';
+  $message = isset($_POST['message']) ? htmlspecialchars(strip_tags($_POST['message'])) : '';
+
+  // Validate data
+  if(empty($name) || empty($email) || empty($subject) || empty($message)) {
+      echo json_encode(['success' => false, 'message' => 'Please fill all the required fields.']);
+      exit;
   }
 
-  $contact = new PHP_Email_Form;
-  $contact->ajax = true;
-  
-  $contact->to = $receiving_email_address;
-  $contact->from_name = $_POST['name'];
-  $contact->from_email = $_POST['email'];
-  $contact->subject = $_POST['subject'];
+  if(!filter_var($email, FILTER_VALIDATE_EMAIL)) {
+      echo json_encode(['success' => false, 'message' => 'Invalid email format.']);
+      exit;
+  }
 
-  // Uncomment below code if you want to use SMTP to send emails. You need to enter your correct SMTP credentials
-  /*
-  $contact->smtp = array(
-    'host' => 'example.com',
-    'username' => 'example',
-    'password' => 'pass',
-    'port' => '587'
-  );
-  */
+  // Create a new PHPMailer instance
+  $mail = new PHPMailer(true);
 
-  $contact->add_message( $_POST['name'], 'From');
-  $contact->add_message( $_POST['email'], 'Email');
-  $contact->add_message( $_POST['message'], 'Message', 10);
+  try {
+      // Server settings
+      $mail->SMTPDebug = 0;                      // Disable verbose debug output
+      $mail->isSMTP();                           // Send using SMTP
+      $mail->Host       = 'smtp.gmail.com';      // SMTP server
+      $mail->SMTPAuth   = true;                  // Enable SMTP authentication
+      $mail->Username   = 'joshua.pardo30@gmail.com'; // SMTP username
+      $mail->Password   = 'hidctktrkkckqzaj';    // SMTP password
+      $mail->SMTPSecure = PHPMailer::ENCRYPTION_SMTPS; // Use SSL
+      $mail->Port       = 465;                   // TCP port to connect to
 
-  echo $contact->send();
-?>
+      // Recipients
+      $mail->setFrom($email, $name);
+      $mail->addAddress('joshua.pardo30@gmail.com'); // Add a recipient
+      $mail->addReplyTo($email, $name);
+
+      // Content
+      $mail->isHTML(true);                       // Set email format to HTML
+      $mail->Subject = $subject;
+      $mail->Body    = "
+          <h3>New message from website contact form</h3>
+          <p><strong>Name:</strong> {$name}</p>
+          <p><strong>Email:</strong> {$email}</p>
+          <p><strong>Message:</strong></p>
+          <p>{$message}</p>
+      ";
+      $mail->AltBody = "New message from: {$name}\nEmail: {$email}\n\nMessage:\n{$message}";
+
+      $mail->send();
+      echo json_encode(['success' => true, 'message' => 'Your message has been sent. Thank you!']);
+  } catch (Exception $e) {
+      echo json_encode(['success' => false, 'message' => "Message could not be sent. Mailer Error: {$mail->ErrorInfo}"]);
+  }
+  ?>
